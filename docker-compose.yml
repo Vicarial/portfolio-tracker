@@ -1,0 +1,16 @@
+services:
+  portfolio-alerts:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - ./config.json:/config/config.json
+    working_dir: /app
+    environment:
+      - FLASK_APP=portfolio_web_app.py
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+      - CONFIG_PATH=/config/config.json
+    restart: unless-stopped
+    command: flask run --host=0.0.0.0 --port=5000

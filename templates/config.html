@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Portfolio Monitor Configuration</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .config-section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 120px; font-family: monospace; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .flash { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .nav { margin-bottom: 20px; }
+        .nav a { margin-right: 15px; color: #3498db; text-decoration: none; }
+        .checkbox-wrapper { display: flex; align-items: center; }
+        .checkbox-wrapper input[type="checkbox"] { width: auto; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Portfolio Monitor Configuration</h1>
+            <div class="nav">
+                <a href="/">Dashboard</a>
+                <a href="/config">Configuration</a>
+                <a href="/thesis">Thesis</a>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        
+        <div class="config-section">
+            <h3>📊 Stock Portfolio</h3>
+            <form method="post" action="/update_stocks">
+                <div class="form-group">
+                    <label>Stock Symbols (one per line or comma-separated):</label>
+                    <textarea name="stocks" placeholder="AAPL&#10;MSFT&#10;GOOGL&#10;TSLA">{{ config.stocks|join('
+') }}</textarea>
+                    <small>Enter stock ticker symbols. You can use new lines or commas to separate them.</small>
+                </div>
+                <button type="submit" class="btn btn-success">💾 Update Portfolio</button>
+            </form>
+        </div>
+        
+        <div class="config-section">
+            <h3>⚙️ Monitoring Settings</h3>
+            <form method="post" action="/update_settings">
+                <div class="form-group">
+                    <label>Alert Threshold (%):</label>
+                    <input type="number" name="alert_threshold" step="0.01" value="{{ '%.2f'|format(config.alert_threshold * 100) }}" required>
+                    <small>Trigger alert when stock falls this percentage below recent high (e.g., 5.0 for 5%)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Lookback Period (days):</label>
+                    <input type="number" name="lookback_days" value="{{ config.lookback_days }}" min="1" max="365" required>
+                    <small>Number of days to look back for the recent high</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Scan Interval (minutes):</label>
+                    <input type="number" name="scan_interval_minutes" value="{{ config.scan_interval_minutes }}" min="1" max="1440" required>
+                    <small>How often to scan when continuous monitoring is enabled</small>
+                </div>
+                
+                <h4>📧 Email Alerts</h4>
+                
+                <div class="form-group">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" name="email_enabled" {{ 'checked' if config.email_settings.enabled }}>
+                        <label>Enable Email Alerts</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Sender Email:</label>
+                    <input type="email" name="sender_email" value="{{ config.email_settings.sender_email }}">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email App Password:</label>
+                    <input type="password" name="sender_password" value="{{ config.email_settings.sender_password }}">
+                    <small>For Gmail, use an App Password, not your regular password</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Recipient Email:</label>
+                    <input type="email" name="recipient_email" value="{{ config.email_settings.recipient_email }}">
+                </div>
+                
+                <div class="form-group">
+                    <label>SMTP Server:</label>
+                    <input type="text" name="smtp_server" value="{{ config.email_settings.smtp_server }}">
+                </div>
+                
+                <div class="form-group">
+                    <label>SMTP Port:</label>
+                    <input type="number" name="smtp_port" value="{{ config.email_settings.smtp_port }}">
+                </div>
+                
+                <button type="submit" class="btn btn-success">💾 Save Settings</button>
+            </form>
+        </div>
+
+        <div class="config-section">
+            <h3>🔗 Integrations</h3>
+            <form method="post" action="/update_settings">
+                <div class="form-group">
+                    <label>TradingView URL:</label>
+                    <input type="url" name="tradingview_url" placeholder="https://www.tradingview.com/chart/..." value="{{ config.tradingview_url if config.tradingview_url is defined else '' }}">
+                    <small>Paste a link to your preferred TradingView chart or workspace. A link will appear in the dashboard header.</small>
+                </div>
+                <button type="submit" class="btn btn-success">💾 Save Integrations</button>
+            </form>
+        </div>
+        
+        <div class="config-section">
+            <h3>📋 Current Configuration</h3>
+            <p><strong>Stocks:</strong> {{ config.stocks|length }} symbols</p>
+            <p><strong>Alert Threshold:</strong> {{ "%.1f"|format(config.alert_threshold * 100) }}%</p>
+            <p><strong>Lookback:</strong> {{ config.lookback_days }} days</p>
+            <p><strong>Scan Interval:</strong> {{ config.scan_interval_minutes }} minutes</p>
+            <p><strong>Email Alerts:</strong> {{ '✅ Enabled' if config.email_settings.enabled else '❌ Disabled' }}</p>
+        </div>
+    </div>
+</body>
+</html>

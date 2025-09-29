@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Portfolio Monitor Dashboard</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .stock-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .alert { border-left: 4px solid #e74c3c; }
+        .ok { border-left: 4px solid #27ae60; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .flash { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash-info { background: #cce7ff; color: #004085; border: 1px solid #b3d7ff; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-number { font-size: 2em; font-weight: bold; color: #3498db; }
+        .nav { margin-bottom: 20px; }
+        .nav a { margin-right: 15px; color: #3498db; text-decoration: none; }
+    </style>
+    <script>
+        function refreshPage() {
+            location.reload();
+        }
+        
+        function updateStockPrices() {
+            console.log('Fetching stock prices...');
+            fetch('/api/stock_prices')
+                .then(response => {
+                    console.log('API Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Received stock data:', data);
+                    if (Object.keys(data).length === 0) {
+                        console.warn('No stock data received');
+                        return;
+                    }
+                    
+                    for (const [symbol, info] of Object.entries(data)) {
+                        console.log(`Processing ${symbol}:`, info);
+                        // Update monitored stock tiles (when present)
+                        const tile = document.getElementById(`stock-${symbol}`);
+                        if (tile) {
+                            if (info.error) {
+                                tile.innerHTML = `
+                                    <h4>${symbol}</h4>
+                                    <p class="price-down">Error: ${info.error}</p>
+                                `;
+                            } else {
+                                const changeClass = info.change >= 0 ? 'price-up' : 'price-down';
+                                const rsiText = (info.rsi === null || info.rsi === undefined) ? 'N/A' : Number(info.rsi).toFixed(2);
+                                tile.innerHTML = `
+                                    <h4>${symbol}</h4>
+                                    <p>$${Number(info.price).toLocaleString()}</p>
+                                    <p class="${changeClass}">${info.change >= 0 ? '+' : ''}${info.change}%</p>
+                                    <p><strong>RSI:</strong> ${rsiText}</p>
+                                `;
+                            }
+                        }
+
+                        // Also update portfolio status cards (when present)
+                        if (!info.error) {
+                            const priceSpan = document.getElementById(`price-${symbol}`);
+                            if (priceSpan) {
+                                priceSpan.textContent = `$${Number(info.price).toLocaleString()}`;
+                            }
+                            const rsiSpan = document.getElementById(`rsi-${symbol}`);
+                            if (rsiSpan) {
+                                rsiSpan.textContent = (info.rsi === null || info.rsi === undefined) ? 'N/A' : Number(info.rsi).toFixed(2);
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error in updateStockPrices:', error);
+                    // Show error in the first stock card if available
+                    const firstStock = document.querySelector('.stock-card');
+                    if (firstStock) {
+                        firstStock.innerHTML += `<p class="price-down">Error: ${error.message}</p>`;
+                    }
+                });
+        }
+
+        // Update status and stock prices on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update status
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('status-indicator').textContent = 
+                        data.monitoring ? '🟢 Monitoring Active' : '🔴 Monitoring Stopped';
+                });
+            
+            // Update stock prices immediately and then every 30 seconds
+            updateStockPrices();
+            setInterval(updateStockPrices, 30000);
+        });
+    </script>
+    <style>
+        .price-up { color: #27ae60; }
+        .price-down { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 Portfolio Monitor Dashboard</h1>
+            <div class="nav">
+                <a href="/">Dashboard</a>
+                <a href="/config">Configuration</a>
+                <a href="/thesis">Thesis</a>
+                {% if config.tradingview_url %}
+                <a href="{{ config.tradingview_url }}" target="_blank">TradingView ↗</a>
+                {% endif %}
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ results|length }}</div>
+                <div>Total Stocks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #e74c3c;">{{ alerts|length }}</div>
+                <div>Active Alerts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #27ae60;">{{ (results|length) - (alerts|length) }}</div>
+                <div>Stocks OK</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.2em;" id="status-indicator">
+                    {% if monitoring %}🟢 Monitoring Active{% else %}🔴 Monitoring Stopped{% endif %}
+                </div>
+                <div>Status</div>
+            </div>
+        </div>
+        
+        <div class="status-card">
+            <h3>Controls</h3>
+            <form method="post" style="display: inline;">
+                <button formaction="/scan_now" class="btn btn-primary">🔍 Scan Now</button>
+                {% if monitoring %}
+                    <button formaction="/stop_monitoring" class="btn btn-danger">⏹️ Stop Monitoring</button>
+                {% else %}
+                    <button formaction="/start_monitoring" class="btn btn-success">▶️ Start Monitoring</button>
+                {% endif %}
+                <button type="button" onclick="refreshPage()" class="btn btn-secondary">🔄 Refresh</button>
+            </form>
+            {% if last_scan_time %}
+                <p><strong>Last Scan:</strong> {{ last_scan_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+            {% endif %}
+            <p><strong>Alert Threshold:</strong> {{ "%.1f"|format(config.alert_threshold * 100) }}% below recent high</p>
+            <p><strong>Lookback Period:</strong> {{ config.lookback_days }} days</p>
+        </div>
+        
+        {% if results %}
+        <div class="status-card">
+            <h3>Portfolio Status</h3>
+            <div class="stock-grid">
+                {% for result in results %}
+                <div class="stock-card {{ 'alert' if result.is_alert else 'ok' }}">
+                    <h4>{{ result.symbol }} {{ result.status }}</h4>
+                    <p><strong>Current:</strong> <span id="price-{{ result.symbol }}">${{ result.current_price }}</span></p>
+                    <p><strong>RSI:</strong> <span id="rsi-{{ result.symbol }}">{{ '%.2f'|format(result.rsi) if result.rsi is not none else 'N/A' }}</span></p>
+                    <p><strong>Recent High:</strong> ${{ result.recent_high }} ({{ result.date_of_high }})</p>
+                    <p><strong>From High:</strong> 
+                        <span style="color: {{ '#e74c3c' if result.pct_from_high < -5 else '#f39c12' if result.pct_from_high < 0 else '#27ae60' }};">
+                            {{ result.pct_from_high }}%
+                        </span>
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        {% if config_stocks %}
+        <div class="status-card">
+            <h3>📊 Monitored Stocks</h3>
+            <div class="stock-grid">
+                {% for stock in config_stocks %}
+                <div class="stock-card" id="stock-{{ stock }}">
+                    <h4>{{ stock }}</h4>
+                    <p>Loading price data...</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="status-card">
+            <h3>No Stocks Configured</h3>
+            <p>Go to <a href="/config">Configuration</a> to add stocks to monitor.</p>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>
